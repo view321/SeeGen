@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Generation Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--surface3:#22222f;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --accent:#7c6aff;--accent2:#b06aff;
+  --text:#f0eeff;--muted:#8880aa;--dim:#3a3760;
+  --green:#4cffb0;--red:#ff6a6a;--amber:#ffb84c;
+  --font:'Syne',sans-serif;--mono:'DM Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;opacity:.3;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E")}
+
+header{padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(10,10,15,.92);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.logo-text{font-size:15px;font-weight:700;letter-spacing:.08em}
+.logo-sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-left:2px}
+.api-badge{font-family:var(--mono);font-size:11px;color:var(--accent);background:rgba(124,106,255,.1);border:1px solid rgba(124,106,255,.2);padding:4px 10px;border-radius:4px}
+
+.layout{display:grid;grid-template-columns:460px 1fr;min-height:calc(100vh - 53px)}
+.panel-left{border-right:1px solid var(--border);overflow-y:auto;background:var(--surface)}
+.panel-right{background:var(--bg);display:flex;flex-direction:column}
+
+.section{padding:16px 18px;border-bottom:1px solid var(--border)}
+.section-label{font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+.field label{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:5px;font-family:var(--mono)}
+.tag{font-size:10px;padding:1px 6px;border-radius:3px}
+.tag.req{color:var(--accent);background:rgba(124,106,255,.1)}
+.tag.opt{color:var(--dim)}
+
+input[type="text"],input[type="number"],input[type="password"],textarea,select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 11px;outline:none;
+  transition:border-color .15s;-webkit-appearance:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:68px;font-family:var(--font);font-size:13px;line-height:1.5}
+
+.input-row{display:flex;gap:6px}
+.input-row input{flex:1}
+.btn-icon{padding:8px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:14px;transition:all .15s;flex-shrink:0}
+.btn-icon:hover{color:var(--text);border-color:var(--border2)}
+
+.radio-group{display:flex;gap:5px;flex-wrap:wrap}
+.radio-btn{padding:5px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .15s;user-select:none}
+.radio-btn:hover{border-color:var(--border2);color:var(--text)}
+.radio-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(124,106,255,.08)}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px}
+.toggle-info .tt{font-size:12px;color:var(--text);font-family:var(--mono)}
+.toggle-info .td{font-size:10px;color:var(--muted);margin-top:1px}
+.toggle{position:relative;width:34px;height:18px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--dim);border-radius:20px;cursor:pointer;transition:background .2s}
+.toggle-slider::before{content:'';position:absolute;width:12px;height:12px;left:3px;top:3px;background:white;border-radius:50%;transition:transform .2s}
+.toggle input:checked+.toggle-slider{background:var(--accent)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(16px)}
+
+.slider-row{display:flex;align-items:center;gap:10px}
+input[type="range"]{flex:1;-webkit-appearance:none;height:3px;background:var(--dim);border-radius:2px;outline:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(124,106,255,.5)}
+.range-val{font-family:var(--mono);font-size:13px;color:var(--accent);min-width:28px;text-align:right}
+
+.cost-bar{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(124,106,255,.04)}
+.cost-label{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.cost-val{font-size:18px;font-weight:600;color:var(--accent);font-family:var(--mono)}
+.generate-section{padding:13px 18px}
+.btn-generate{width:100%;padding:13px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;letter-spacing:.05em;transition:all .2s}
+.btn-generate:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(124,106,255,.3)}
+.btn-generate:active{transform:translateY(0)}
+.btn-generate:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* GitHub config */
+.gh-config{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:12px}
+.gh-config h4{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px}
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fl{font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:4px}
+.cfg-status{font-size:10px;font-family:var(--mono);margin-top:6px}
+.cfg-status.ok{color:var(--green)}
+.cfg-status.warn{color:var(--amber)}
+.cfg-hint{font-size:10px;color:var(--dim);font-family:var(--mono);margin-top:4px;line-height:1.6}
+
+/* drop zone */
+.drop-zone{border:1.5px dashed var(--border2);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface2);position:relative}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:rgba(124,106,255,.05)}
+.drop-zone input[type="file"]{display:none}
+.dz-inner{display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
+.dz-icon{font-size:22px;opacity:.45}
+.dz-text{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.dz-sub{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.upload-progress{margin-top:10px;display:none}
+.up-text{font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:4px;text-align:left}
+.progress-bar{height:3px;background:var(--dim);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .3s}
+
+/* image grid */
+.img-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.img-thumb{aspect-ratio:1;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;border:2px solid transparent;transition:all .15s;background:var(--surface3)}
+.img-thumb:hover{border-color:var(--border2)}
+.img-thumb.sel-s{border-color:var(--accent)}
+.img-thumb.sel-e{border-color:var(--amber)}
+.img-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.img-badge{position:absolute;top:4px;left:4px;font-size:9px;font-family:var(--mono);padding:2px 5px;border-radius:3px;font-weight:600;backdrop-filter:blur(4px);line-height:1.4}
+.badge-s{background:rgba(124,106,255,.9);color:white}
+.badge-e{background:rgba(255,184,76,.9);color:#1a1a00}
+.img-del{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(255,106,106,.85);color:white;font-size:10px;display:none;align-items:center;justify-content:center;cursor:pointer;border:none;line-height:1}
+.img-thumb:hover .img-del{display:flex}
+.img-empty{font-size:11px;color:var(--dim);font-family:var(--mono);text-align:center;padding:10px 0;margin-top:8px}
+
+.sel-row{display:flex;gap:6px;margin-top:10px}
+.sel-chip{flex:1;padding:6px 9px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:6px;overflow:hidden;min-width:0}
+.sel-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sel-dot.s{background:var(--accent)}
+.sel-dot.e{background:var(--amber)}
+.sel-text{font-size:10px;font-family:var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel-text.set{color:var(--text)}
+
+/* right panel */
+.tabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.tab{padding:12px 13px;font-size:12px;font-family:var(--mono);color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-content{display:none;flex:1;padding:16px;overflow-y:auto}
+.tab-content.active{display:flex;flex-direction:column;gap:12px}
+
+.output-card{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;min-height:340px}
+.output-header{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.output-title{font-size:10px;color:var(--muted);font-family:var(--mono);letter-spacing:.1em}
+.status-pill{display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);padding:3px 9px;border-radius:20px;border:1px solid}
+.status-pill.idle{color:var(--dim);border-color:var(--dim)}
+.status-pill.running{color:var(--amber);border-color:var(--amber)}
+.status-pill.done{color:var(--green);border-color:var(--green)}
+.status-pill.error{color:var(--red);border-color:var(--red)}
+.status-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.status-pill.running .status-dot{animation:pulse 1s infinite}
+
+.output-body{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:20px}
+.placeholder-text{font-size:12px;color:var(--dim);font-family:var(--mono);text-align:center;line-height:2}
+
+/* polling UI */
+.polling-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+.spinner{width:30px;height:30px;border:2px solid var(--dim);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.polling-info{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.polling-id{font-size:10px;color:var(--dim);font-family:var(--mono);margin-top:4px;word-break:break-all}
+.elapsed{font-size:11px;color:var(--amber);font-family:var(--mono)}
+.job-persist-bar{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.jp-text{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.jp-text span{color:var(--amber)}
+.btn-cancel{padding:5px 12px;background:rgba(255,106,106,.08);border:1px solid rgba(255,106,106,.2);color:var(--red);border-radius:5px;font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .15s}
+.btn-cancel:hover{background:rgba(255,106,106,.14)}
+
+video{max-width:100%;max-height:400px;border-radius:6px;background:#000}
+.result-meta{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.meta-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 12px}
+.meta-key{font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:3px}
+.meta-val{font-size:14px;font-weight:600;font-family:var(--mono)}
+.meta-val.green{color:var(--green)}
+.meta-val.accent{color:var(--accent)}
+.btn-download{padding:8px 18px;background:rgba(76,255,176,.08);border:1px solid rgba(76,255,176,.25);color:var(--green);border-radius:6px;font-size:12px;font-family:var(--mono);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn-download:hover{background:rgba(76,255,176,.14)}
+.error-box{background:rgba(255,106,106,.06);border:1px solid rgba(255,106,106,.2);border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:12px;color:var(--red);white-space:pre-wrap;word-break:break-word;width:100%}
+
+.code-header{display:flex;justify-content:flex-end;margin-bottom:6px}
+.code-block{background:#0d0d14;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--mono);font-size:12px;color:#c8c0f0;overflow:auto;white-space:pre;line-height:1.7;max-height:560px}
+.code-block .k{color:#9d7fff}.code-block .s{color:#7effcc}.code-block .n{color:#ffb84c}.code-block .b{color:#ff8c8c}
+.copy-btn{padding:5px 12px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);border-radius:5px;font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .15s}
+.copy-btn:hover{color:var(--text)}
+
+.history-empty{font-size:12px;color:var(--muted);font-family:var(--mono);text-align:center;padding:28px 0}
+.history-item{padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s;margin-bottom:6px}
+.history-item:hover{border-color:var(--border2)}
+.history-thumb{width:54px;height:36px;background:var(--surface2);border-radius:4px;overflow:hidden;flex-shrink:0}
+.history-thumb video{width:100%;height:100%;object-fit:cover}
+.h-prompt{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.h-details{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.h-cost{font-size:12px;color:var(--accent);font-family:var(--mono);margin-left:auto;flex-shrink:0}
+.h-running{font-size:10px;color:var(--amber);font-family:var(--mono);margin-left:auto;flex-shrink:0}
+
+@media(max-width:860px){.layout{grid-template-columns:1fr}.panel-left{border-right:none;border-bottom:1px solid var(--border)}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <span class="logo-text">VIDEO STUDIO</span>
+    <span class="logo-sub" id="headerSub">seedance 1.5 pro</span>
+  </div>
+  <div class="api-badge">runpod public endpoint</div>
+</header>
+
+<div class="layout">
+
+  <!-- ===== LEFT PANEL ===== -->
+  <div class="panel-left">
+
+    <div class="section">
+      <div class="section-label">Model</div>
+      <div class="field">
+        <label>Select model <span class="tag req">required</span></label>
+        <div class="radio-group" id="modelGroup" style="flex-direction:column;gap:5px">
+          <div class="radio-btn active" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('seedance-v1-5-pro-i2v','Seedance 1.5 Pro',this)">
+            <span>Seedance 1.5 Pro</span><span style="font-size:10px;color:var(--muted)">I2V · FLF2V · 480p/720p</span>
+          </div>
+          <div class="radio-btn" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('minimax-hailuo-02-std','Hailuo 02 Standard',this)">
+            <span>Hailuo 02 Standard</span><span style="font-size:10px;color:var(--muted)">T2V · I2V · FLF2V · 768p/1080p</span>
+          </div>
+          <div class="radio-btn" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('p-video','Pruna P-Video',this)">
+            <span>Pruna P-Video</span><span style="font-size:10px;color:var(--muted)">T2V · I2V · 720p/1080p · Draft</span>
+          </div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label>Endpoint URL <span class="tag opt">auto-set</span></label>
+        <div class="input-row">
+          <input type="text" id="endpointUrl" oninput="updatePreview()" style="font-size:11px">
+          <button class="btn-icon" onclick="$('endpointUrl').value=MODEL_ENDPOINTS[S.model];updatePreview()" title="Reset to default">↺</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">RunPod</div>
+      <div class="field">
+        <label>API key <span class="tag req">required</span></label>
+        <div class="input-row">
+          <input type="password" id="apiKey" placeholder="Bearer token from RunPod console">
+          <button class="btn-icon" onclick="toggleKey('apiKey')">👁</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Image Library · GitHub</div>
+
+      <div class="gh-config">
+        <h4>GitHub setup (one-time)</h4>
+        <div class="config-grid">
+          <div>
+            <div class="fl">Username/repo</div>
+            <input type="text" id="ghRepo" placeholder="you/images-repo" oninput="saveConfig()">
+          </div>
+          <div>
+            <div class="fl">Branch <span class="tag opt">default main</span></div>
+            <input type="text" id="ghBranch" placeholder="main" oninput="saveConfig()">
+          </div>
+        </div>
+        <div style="margin-top:6px">
+          <div class="fl">Personal access token <span class="tag opt">Contents: write</span></div>
+          <div class="input-row">
+            <input type="password" id="ghToken" placeholder="github_pat_…" oninput="saveConfig()">
+            <button class="btn-icon" onclick="toggleKey('ghToken')">👁</button>
+          </div>
+        </div>
+        <div class="cfg-status warn" id="cfgStatus">Enter repo (user/repo), branch, and token</div>
+        <div class="cfg-hint">Settings → Developer settings → Fine-grained tokens → Contents: Read &amp; Write · Repo must be public</div>
+      </div>
+
+      <div class="drop-zone" id="dropZone"
+        onclick="document.getElementById('fileInput').click()"
+        ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <input type="file" id="fileInput" accept="image/*" multiple onchange="handleFiles(this.files)">
+        <div class="dz-inner">
+          <div class="dz-icon">⬆</div>
+          <div class="dz-text">Drop images or click to upload</div>
+          <div class="dz-sub">Uploads to your GitHub repo · PNG · JPG · WEBP</div>
+        </div>
+        <div class="upload-progress" id="uploadProgress">
+          <div class="up-text" id="upText">Uploading…</div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+      </div>
+
+      <div class="img-grid" id="imgGrid"></div>
+      <div class="img-empty" id="imgEmpty">Upload images to build your library</div>
+
+      <div class="sel-row" id="selRow" style="display:none">
+        <div class="sel-chip">
+          <div class="sel-dot s"></div>
+          <span class="sel-text" id="startLabel">click image → start frame</span>
+        </div>
+        <div class="sel-chip">
+          <div class="sel-dot e"></div>
+          <span class="sel-text" id="endLabel">click 2nd image → end (FLF2V)</span>
+        </div>
+      </div>
+      <div id="flf2vBadge" style="display:none;margin-top:8px;padding:6px 10px;background:rgba(255,184,76,.07);border:1px solid rgba(255,184,76,.25);border-radius:6px;font-size:11px;font-family:var(--mono);color:var(--amber)">
+        ✦ FLF2V mode active — first + last frame set
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Prompt</div>
+      <div class="field">
+        <label>input.prompt <span class="tag req">required</span></label>
+        <textarea id="prompt" oninput="updatePreview()">The character slowly turns and smiles at the camera</textarea>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Video Settings</div>
+
+      <div class="field">
+        <label>input.duration <span class="tag opt">4–12s · default 5</span></label>
+        <div class="slider-row">
+          <input type="range" id="duration" min="4" max="12" step="1" value="5" oninput="onDur(this.value)">
+          <span class="range-val" id="durVal">5s</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>input.resolution <span class="tag opt">default 720p</span></label>
+        <div class="radio-group" id="resGroup">
+          <div class="radio-btn" id="res480btn" onclick="pick('res','480p',this,'resGroup')">480p</div>
+          <div class="radio-btn" id="res768btn" style="display:none" onclick="pick('res','768p',this,'resGroup')">768p</div>
+          <div class="radio-btn active" onclick="pick('res','720p',this,'resGroup')">720p</div>
+          <div class="radio-btn" id="res1080btn" style="display:none" onclick="pick('res','1080p',this,'resGroup')">1080p</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:4px" id="resCostHint"></div>
+      </div>
+
+      <div class="field">
+        <label>input.aspect_ratio <span class="tag opt">default 16:9</span></label>
+        <div class="radio-group" id="arGroup">
+          <div class="radio-btn" onclick="pick('aspect','21:9',this,'arGroup')">21:9</div>
+          <div class="radio-btn active" onclick="pick('aspect','16:9',this,'arGroup')">16:9</div>
+          <div class="radio-btn" onclick="pick('aspect','9:16',this,'arGroup')">9:16</div>
+          <div class="radio-btn" onclick="pick('aspect','1:1',this,'arGroup')">1:1</div>
+          <div class="radio-btn" onclick="pick('aspect','4:3',this,'arGroup')">4:3</div>
+          <div class="radio-btn" onclick="pick('aspect','3:4',this,'arGroup')">3:4</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:6px">
+        <div class="toggle-row" id="cameraFixedRow">
+          <div class="toggle-info"><div class="tt">input.camera_fixed</div><div class="td">Keep camera static · default false</div></div>
+          <label class="toggle"><input type="checkbox" id="cameraFixed" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><div class="tt">input.generate_audio</div><div class="td">Generate ambient audio · default false</div></div>
+          <label class="toggle"><input type="checkbox" id="generateAudio" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>input.seed <span class="tag opt">−1 = random</span></label>
+        <input type="number" id="seed" value="-1" min="-1" oninput="updatePreview()">
+      </div>
+    </div>
+
+    <div class="cost-bar">
+      <span class="cost-label">Estimated cost</span>
+      <span class="cost-val" id="costVal">$0.26</span>
+    </div>
+    <div class="generate-section">
+      <div id="t2vNote" style="display:none;font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;padding:6px 10px;background:rgba(124,106,255,.06);border:1px solid rgba(124,106,255,.15);border-radius:5px">
+        ✦ Hailuo 2: no image required for T2V mode — image optional for I2V, set both for FLF2V
+      </div>
+      <button class="btn-generate" id="genBtn" onclick="generate()">Generate Video →</button>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT PANEL ===== -->
+  <div class="panel-right">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('output',this)">Output</div>
+      <div class="tab" onclick="switchTab('request',this)">Request JSON</div>
+      <div class="tab" onclick="switchTab('history',this)">History</div>
+    </div>
+
+    <div class="tab-content active" id="tab-output">
+      <div class="output-card">
+        <div class="output-header">
+          <span class="output-title">VIDEO OUTPUT</span>
+          <div class="status-pill idle" id="statusPill"><div class="status-dot"></div><span id="statusText">idle</span></div>
+        </div>
+        <div class="output-body" id="outputBody">
+          <div class="placeholder-text">
+            1. Enter GitHub repo + token above<br>
+            2. Upload images → they go to your repo<br>
+            3. Click image to set start frame (purple)<br>
+            4. Click another for end frame / FLF2V (amber)<br>
+            5. Write prompt → Generate
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-request">
+      <div class="code-header"><button class="copy-btn" onclick="copyReq()">Copy JSON</button></div>
+      <div class="code-block" id="reqPreview"></div>
+    </div>
+
+    <div class="tab-content" id="tab-history">
+      <div id="historyList"><div class="history-empty">No generations yet</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+const S = {
+  res: '720p', aspect: '16:9',
+  model: 'seedance-v1-5-pro-i2v',
+  images: [], startUrl: null, endUrl: null,
+  history: [], running: false,
+  // polling
+  activeJobId: null,
+  activeJobStartTime: null,
+  pollTimer: null,
+  elapsedTimer: null
+};
+
+// Per-model endpoint IDs (RunPod) — verified slugs
+const MODEL_ENDPOINTS = {
+  'seedance-v1-5-pro-i2v':  'https://api.runpod.ai/v2/seedance-v1-5-pro-i2v',
+  'minimax-hailuo-02-std':  'https://api.runpod.ai/v2/minimax-hailuo-02-std',
+  'p-video':                'https://api.runpod.ai/v2/p-video'
+};
+
+// Per-model cost tables ($/s or $/video) per resolution — from RunPod docs
+const MODEL_COSTS = {
+  'seedance-v1-5-pro-i2v': { '480p': 0.024, '720p': 0.052 },
+  'minimax-hailuo-02-std':  { '768p': 0.028, '1080p': 0.048 },  // approx — check RunPod playground
+  'p-video':                { '720p': 0.020, '1080p': 0.040 }
+};
+
+// Models that support 1080p (or equivalent high-res)
+const SUPPORTS_1080P = new Set(['minimax-hailuo-02-std', 'p-video']);
+// Models that support T2V (no image required)
+const SUPPORTS_T2V = new Set(['minimax-hailuo-02-std', 'p-video']);
+// Models that support FLF2V (last_image / end frame)
+const SUPPORTS_FLF2V = new Set(['seedance-v1-5-pro-i2v', 'minimax-hailuo-02-std']);
+// Models that support draft mode
+const SUPPORTS_DRAFT = new Set(['p-video']);
+
+const POLL_INTERVAL = 3000; // 3 seconds
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const lss = (k,v) => localStorage.setItem(k, typeof v === 'object' ? JSON.stringify(v) : v);
+const lsg = k => localStorage.getItem(k);
+const lsj = k => { try { return JSON.parse(lsg(k)); } catch { return null; } }
+
+// ── Model selection ──────────────────────────────────────────────────────────
+function pickModel(modelId, label, el) {
+  document.querySelectorAll('#modelGroup .radio-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  S.model = modelId;
+  $('endpointUrl').value = MODEL_ENDPOINTS[modelId];
+  $('headerSub').textContent = label.toLowerCase();
+  updateModelUI();
+  updateCost();
+  updatePreview();
+}
+
+function updateModelUI() {
+  const isHailuo = S.model === 'minimax-hailuo-02-std';
+  const costs = MODEL_COSTS[S.model];
+
+  // Show/hide 1080p button; for Hailuo swap 480p→768p
+  const btn480 = $('res480btn');
+  const btn768 = $('res768btn');
+  const btn1080 = $('res1080btn');
+
+  if(isHailuo) {
+    if(btn480) btn480.style.display = 'none';
+    if(btn768) btn768.style.display = '';
+    // if currently on 480p, switch to 768p
+    if(S.res === '480p') { S.res = '768p'; activateRes('768p'); }
+  } else {
+    if(btn480) btn480.style.display = '';
+    if(btn768) btn768.style.display = 'none';
+    if(S.res === '768p') { S.res = '720p'; activateRes('720p'); }
+  }
+
+  if(SUPPORTS_1080P.has(S.model)) {
+    if(btn1080) btn1080.style.display = '';
+  } else {
+    if(btn1080) btn1080.style.display = 'none';
+    if(S.res === '1080p') { S.res = isHailuo ? '768p' : '720p'; activateRes(S.res); }
+  }
+
+  // Update cost hint
+  const hint = $('resCostHint');
+  if(hint) hint.textContent = Object.entries(costs).map(([r,c])=>`${r}: $${c}/s`).join('  ·  ');
+
+  // Hide camera_fixed for Hailuo (not supported)
+  const cfRow = $('cameraFixedRow');
+  if(cfRow) cfRow.style.display = isHailuo ? 'none' : '';
+
+  // Show T2V note for models that don't require an image
+  const t2vNote = $('t2vNote');
+  if(t2vNote) t2vNote.style.display = SUPPORTS_T2V.has(S.model) ? '' : 'none';
+}
+
+function activateRes(res) {
+  document.querySelectorAll('#resGroup .radio-btn').forEach(b=>{
+    b.classList.toggle('active', b.textContent.startsWith(res));
+  });
+  S.res = res;
+}
+
+// ── Config ──────────────────────────────────────────────────────────────────
+function saveConfig() {
+  const r=$('ghRepo').value.trim(), b=$('ghBranch').value.trim(), t=$('ghToken').value.trim();
+  if(r) lss('sd_repo',r); if(b) lss('sd_branch',b); if(t) lss('sd_ghtoken',t);
+  updateCfgStatus();
+}
+function loadConfig() {
+  $('ghRepo').value = lsg('sd_repo')||'';
+  $('ghBranch').value = lsg('sd_branch')||'main';
+  $('ghToken').value = lsg('sd_ghtoken')||'';
+  $('apiKey').value = lsg('sd_rpkey')||'';
+  updateCfgStatus();
+  const imgs = lsj('sd_imgs');
+  if(imgs) { S.images = imgs; renderGrid(); }
+  // Restore history
+  const hist = lsj('sd_history');
+  if(hist) { S.history = hist; renderHistory(); }
+  // Restore any in-progress job
+  const job = lsj('sd_active_job');
+  if(job && job.id) {
+    S.activeJobId = job.id;
+    S.activeJobStartTime = job.startTime;
+    S.running = true;
+    $('genBtn').disabled = true;
+    $('genBtn').textContent = 'Generating…';
+    showPollingUI(job.id, job.prompt);
+    startPolling(job.id, job.prompt);
+  }
+}
+function updateCfgStatus() {
+  const ok = $('ghRepo').value.trim() && $('ghToken').value.trim();
+  $('cfgStatus').textContent = ok ? '✓ Ready — images will upload to your repo' : 'Enter repo (user/repo) and token';
+  $('cfgStatus').className = 'cfg-status '+(ok?'ok':'warn');
+}
+$('apiKey').addEventListener('input', () => lss('sd_rpkey', $('apiKey').value));
+
+// ── Toggle key visibility ───────────────────────────────────────────────────
+function toggleKey(id) { const i=$(id); i.type=i.type==='password'?'text':'password'; }
+
+// ── Drag & drop ─────────────────────────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); $('dropZone').classList.add('drag-over'); }
+function onDragLeave() { $('dropZone').classList.remove('drag-over'); }
+function onDrop(e) { e.preventDefault(); $('dropZone').classList.remove('drag-over'); handleFiles(e.dataTransfer.files); }
+
+function handleFiles(files) {
+  const repo=$('ghRepo').value.trim(), token=$('ghToken').value.trim(), branch=$('ghBranch').value.trim()||'main';
+  if(!repo||!token) { alert('Please enter your GitHub repo and token first.'); return; }
+  uploadQueue(Array.from(files), repo, branch, token);
+}
+
+async function uploadQueue(files, repo, branch, token) {
+  const prog=$('uploadProgress'), fill=$('progressFill'), text=$('upText');
+  prog.style.display='block';
+  for(let i=0;i<files.length;i++) {
+    text.textContent=`Uploading ${files[i].name} (${i+1}/${files.length})…`;
+    fill.style.width=((i/files.length)*100)+'%';
+    await uploadToGitHub(files[i], repo, branch, token);
+  }
+  fill.style.width='100%';
+  text.textContent=`Done! ${files.length} image${files.length>1?'s':''} uploaded`;
+  setTimeout(()=>{ prog.style.display='none'; fill.style.width='0%'; }, 2000);
+  $('fileInput').value='';
+}
+
+async function uploadToGitHub(file, repo, branch, token) {
+  const base64 = await new Promise((res,rej) => {
+    const r=new FileReader();
+    r.onload=e=>res(e.target.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const filename = `images/${Date.now()}_${safeName}`;
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${repo}/contents/${filename}`, {
+      method:'PUT',
+      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},
+      body:JSON.stringify({ message:`Upload ${file.name}`, content:base64, branch })
+    });
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(data.message||'Upload failed');
+    S.images.unshift({ url:data.content.download_url, name:file.name });
+    lss('sd_imgs', S.images.slice(0,80));
+    renderGrid();
+  } catch(e) { alert(`Failed to upload ${file.name}: ${e.message}`); }
+}
+
+// ── Image grid ──────────────────────────────────────────────────────────────
+function renderGrid() {
+  const grid=$('imgGrid'), empty=$('imgEmpty'), selRow=$('selRow');
+  if(!S.images.length) { grid.innerHTML=''; empty.style.display='block'; selRow.style.display='none'; return; }
+  empty.style.display='none'; selRow.style.display='flex';
+  grid.innerHTML=S.images.map((img,i)=>{
+    const isS=S.startUrl===img.url, isE=S.endUrl===img.url;
+    const cls=isS?'sel-s':isE?'sel-e':'';
+    const badge=isS?'<span class="img-badge badge-s">START</span>':isE?'<span class="img-badge badge-e">END</span>':'';
+    return `<div class="img-thumb ${cls}" onclick="thumbClick(${i})" title="${img.name}">
+      <img src="${img.url}" loading="lazy" alt="${img.name}">${badge}
+      <button class="img-del" onclick="removeImg(${i},event)">✕</button>
+    </div>`;
+  }).join('');
+  updateSelLabels();
+  // FLF2V badge
+  const badge=$('flf2vBadge');
+  if(badge) badge.style.display=(S.startUrl&&S.endUrl)?'block':'none';
+}
+function thumbClick(i) {
+  const url=S.images[i].url;
+  if(!S.startUrl) S.startUrl=url;
+  else if(S.startUrl===url) { S.startUrl=S.endUrl||null; S.endUrl=null; }
+  else if(!S.endUrl) S.endUrl=url;
+  else if(S.endUrl===url) S.endUrl=null;
+  else { S.startUrl=url; S.endUrl=null; }
+  renderGrid(); updatePreview();
+}
+function removeImg(i,e) {
+  e.stopPropagation();
+  const url=S.images[i].url;
+  if(S.startUrl===url) S.startUrl=null;
+  if(S.endUrl===url) S.endUrl=null;
+  S.images.splice(i,1);
+  lss('sd_imgs', S.images.slice(0,80));
+  renderGrid(); updatePreview();
+}
+function updateSelLabels() {
+  const find=url=>{ const i=S.images.find(x=>x.url===url); return i?i.name:'set'; };
+  const sl=$('startLabel'), el=$('endLabel');
+  if(S.startUrl){ sl.textContent=find(S.startUrl); sl.className='sel-text set'; }
+  else { sl.textContent='click image → start frame'; sl.className='sel-text'; }
+  if(S.endUrl){ el.textContent=find(S.endUrl); el.className='sel-text set'; }
+  else { el.textContent='click 2nd image → end (FLF2V)'; el.className='sel-text'; }
+}
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+function pick(key,val,el,groupId) {
+  document.querySelectorAll('#'+groupId+' .radio-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active'); S[key]=val; updateCost(); updatePreview();
+}
+function onDur(v) { $('durVal').textContent=v+'s'; updateCost(); updatePreview(); }
+function updateCost() { const d=parseInt($('duration').value); const costs=MODEL_COSTS[S.model]||MODEL_COSTS['seedance-v1-5-pro-i2v']; $('costVal').textContent='$'+((costs[S.res]||0.052)*d).toFixed(3); }
+
+// ── Request preview ──────────────────────────────────────────────────────────
+function buildPayload() {
+  const isHailuo = S.model === 'minimax-hailuo-02-std';
+  const isPVideo  = S.model === 'p-video';
+  const isFLF2V   = !!(S.startUrl && S.endUrl) && SUPPORTS_FLF2V.has(S.model);
+
+  const input = {
+    prompt: $('prompt').value || 'cinematic video',
+    duration: parseInt($('duration').value),
+    resolution: S.res,
+    seed: parseInt($('seed').value)
+  };
+
+  if(isHailuo) {
+    // Hailuo 02 uses image / end_image
+    if(S.startUrl) input.image = S.startUrl;
+    if(isFLF2V)    input.end_image = S.endUrl;
+    input.prompt_optimizer = true;
+  } else {
+    // Seedance + P-Video use image / last_image
+    if(S.startUrl) input.image = S.startUrl;
+    if(isFLF2V)    input.last_image = S.endUrl;
+    input.aspect_ratio = S.aspect;
+  }
+
+  if(!isHailuo && !isPVideo) {
+    // Seedance-specific
+    input.camera_fixed   = $('cameraFixed').checked;
+    input.generate_audio = $('generateAudio').checked;
+  }
+  if(isPVideo) {
+    input.fps = 24;
+    input.prompt_upsampling = true;
+  }
+
+  return { input };
+}
+
+function getEndpoint() {
+  return ($('endpointUrl').value.trim()) || MODEL_ENDPOINTS[S.model];
+}
+function updatePreview() {
+  updateCost();
+  const json=JSON.stringify(buildPayload(),null,2);
+  $('reqPreview').innerHTML=json
+    .replace(/("[\w_]+")\s*:/g,'<span class="k">$1</span>:')
+    .replace(/:\s*("(?:[^"\\]|\\.)*")/g,': <span class="s">$1</span>')
+    .replace(/:\s*(-?\d+\.?\d*)/g,': <span class="n">$1</span>')
+    .replace(/:\s*(true|false)/g,': <span class="b">$1</span>');
+}
+function copyReq() {
+  navigator.clipboard.writeText(JSON.stringify(buildPayload(),null,2));
+  const b=document.querySelector('.copy-btn'); b.textContent='Copied!';
+  setTimeout(()=>b.textContent='Copy JSON',1500);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name,el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active'); $('tab-'+name).classList.add('active');
+  if(name==='request') updatePreview();
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+function setStatus(type,text) {
+  $('statusPill').className='status-pill '+type;
+  $('statusText').textContent=text;
+}
+
+// ── Elapsed timer ─────────────────────────────────────────────────────────────
+function startElapsedTimer() {
+  if(S.elapsedTimer) clearInterval(S.elapsedTimer);
+  S.elapsedTimer = setInterval(() => {
+    const el=$('elapsedTime');
+    if(!el) return;
+    const secs=Math.floor((Date.now()-S.activeJobStartTime)/1000);
+    const m=Math.floor(secs/60), s=secs%60;
+    el.textContent=m>0?`${m}m ${s}s`:`${s}s`;
+  }, 1000);
+}
+function stopElapsedTimer() {
+  if(S.elapsedTimer) { clearInterval(S.elapsedTimer); S.elapsedTimer=null; }
+}
+
+// ── Polling UI ────────────────────────────────────────────────────────────────
+function showPollingUI(jobId, prompt) {
+  setStatus('running','generating');
+  // Switch to output tab
+  document.querySelectorAll('.tab')[0].click();
+  $('outputBody').innerHTML=`
+    <div class="polling-wrap">
+      <div class="spinner"></div>
+      <div class="polling-info">
+        Generating video…<br>
+        <span class="elapsed">Elapsed: <span id="elapsedTime">0s</span></span>
+      </div>
+      <div class="polling-id">Job ID: ${jobId}</div>
+      <div class="job-persist-bar">
+        <div class="jp-text">Job saved — <span>safe to close this tab</span> and reopen to resume</div>
+        <button class="btn-cancel" onclick="cancelJob()">Cancel</button>
+      </div>
+    </div>`;
+  startElapsedTimer();
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+async function generate() {
+  const apiKey=$('apiKey').value.trim();
+  if(!apiKey) { alert('Enter your RunPod API key'); return; }
+  // T2V models don't require an image; others do
+  if(!S.startUrl && !SUPPORTS_T2V.has(S.model)) { alert('Select a start frame from the image library'); return; }
+  if(S.running) return;
+
+  S.running=true;
+  $('genBtn').disabled=true;
+  $('genBtn').textContent='Starting…';
+
+  const payload=buildPayload();
+  const prompt=payload.input.prompt;
+  const endpoint=getEndpoint();
+
+  try {
+    const res=await fetch(`${endpoint}/run`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const data=await res.json();
+    if(!res.ok||data.error) throw new Error(data.error||JSON.stringify(data));
+
+    const jobId=data.id;
+    S.activeJobId=jobId;
+    S.activeJobStartTime=Date.now();
+
+    // Persist job to localStorage immediately
+    lss('sd_active_job',{ id:jobId, startTime:S.activeJobStartTime, prompt });
+
+    // Add to history as "running"
+    addHistoryRunning(jobId, prompt);
+
+    showPollingUI(jobId, prompt);
+    startPolling(jobId, prompt);
+
+  } catch(e) {
+    S.running=false;
+    $('genBtn').disabled=false;
+    $('genBtn').textContent='Generate Video →';
+    setStatus('error','failed');
+    $('outputBody').innerHTML=`<div class="error-box">${e.message}</div>`;
+  }
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+function startPolling(jobId, prompt) {
+  if(S.pollTimer) clearInterval(S.pollTimer);
+  S.pollTimer=setInterval(()=>pollStatus(jobId, prompt), POLL_INTERVAL);
+  // Poll immediately once
+  pollStatus(jobId, prompt);
+}
+
+async function pollStatus(jobId, prompt) {
+  const apiKey=$('apiKey').value.trim();
+  if(!apiKey) return; // Can't poll without key
+
+  try {
+    const res=await fetch(`${getEndpoint()}/status/${jobId}`,{
+      headers:{'Authorization':'Bearer '+apiKey}
+    });
+    const data=await res.json();
+
+    if(data.status==='COMPLETED') {
+      finishJob(jobId, prompt, data);
+    } else if(data.status==='FAILED' || data.status==='CANCELLED') {
+      failJob(jobId, prompt, data);
+    }
+    // IN_QUEUE or IN_PROGRESS → keep polling
+    updatePollingStatus(data.status);
+
+  } catch(e) {
+    // Network error — keep polling, don't fail
+    console.warn('Poll error:', e.message);
+  }
+}
+
+function updatePollingStatus(status) {
+  const info=document.querySelector('.polling-info');
+  if(!info) return;
+  const msgs={ IN_QUEUE:'In queue…', IN_PROGRESS:'Generating video…', COMPLETED:'Done!', FAILED:'Failed' };
+  const first=info.firstChild;
+  if(first && first.nodeType===3) first.textContent=(msgs[status]||status)+'\n';
+}
+
+async function finishJob(jobId, prompt, data) {
+  stopPolling();
+  stopElapsedTimer();
+  clearActiveJob();
+
+  const output = data.output || {};
+  const videoUrl = output.video_url || output.result || output.url || output.video || output.output
+    || (Array.isArray(output) ? output[0] : null)
+    || null;
+  const cost = output.cost;
+  const execTime = data.executionTime ? (data.executionTime/1000).toFixed(1) : '—';
+
+  setStatus('done','completed');
+
+  if (!videoUrl) {
+    $('outputBody').innerHTML=`
+      <div class="error-box">Completed but no video URL found.\n\nRaw output:\n${JSON.stringify(data, null, 2)}</div>`;
+    updateHistoryItem(jobId, null, null, cost, execTime);
+    S.running=false;
+    $('genBtn').disabled=false;
+    $('genBtn').textContent='Generate Video →';
+    return;
+  }
+
+  const slug = prompt.slice(0,30).replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  const filename = `seedance_${Date.now()}_${slug}.mp4`;
+
+  // Show brief loading state while fetching blob
+  $('outputBody').innerHTML=`
+    <div class="spinner"></div>
+    <div style="font-size:12px;color:var(--muted);font-family:var(--mono)">Fetching video…</div>`;
+
+  // Fetch as blob to bypass CDN CORS restrictions
+  let blobUrl = videoUrl;
+  try {
+    const r = await fetch(videoUrl);
+    if (r.ok) {
+      const blob = await r.blob();
+      blobUrl = URL.createObjectURL(blob);
+    }
+  } catch(e) {
+    console.warn('Blob fetch failed, using direct URL:', e.message);
+  }
+
+  $('outputBody').innerHTML=`
+    <video controls autoplay loop src="${blobUrl}"></video>
+    <div class="result-meta">
+      <div class="meta-card"><div class="meta-key">cost</div><div class="meta-val green">$${parseFloat(cost||0).toFixed(3)}</div></div>
+      <div class="meta-card"><div class="meta-key">exec time</div><div class="meta-val accent">${execTime}s</div></div>
+      <div class="meta-card"><div class="meta-key">job id</div><div class="meta-val" style="font-size:10px;color:var(--muted)">${jobId.slice(0,20)}…</div></div>
+    </div>
+    <a class="btn-download" href="${blobUrl}" download="${filename}">↓ Download MP4</a>`;
+
+  // Store original URL in history (blob URLs die on reload)
+  updateHistoryItem(jobId, videoUrl, blobUrl, cost, execTime);
+
+  S.running=false;
+  $('genBtn').disabled=false;
+  $('genBtn').textContent='Generate Video →';
+}
+
+function failJob(jobId, prompt, data) {
+  stopPolling();
+  stopElapsedTimer();
+  clearActiveJob();
+  setStatus('error','failed');
+  $('outputBody').innerHTML=`<div class="error-box">${JSON.stringify(data,null,2)}</div>`;
+  removeHistoryItem(jobId);
+  S.running=false;
+  $('genBtn').disabled=false;
+  $('genBtn').textContent='Generate Video →';
+}
+
+function stopPolling() {
+  if(S.pollTimer) { clearInterval(S.pollTimer); S.pollTimer=null; }
+}
+
+function clearActiveJob() {
+  S.activeJobId=null;
+  S.activeJobStartTime=null;
+  localStorage.removeItem('sd_active_job');
+}
+
+function cancelJob() {
+  if(!confirm('Cancel the current generation? The job may still run on RunPod.')) return;
+  stopPolling();
+  stopElapsedTimer();
+  clearActiveJob();
+  setStatus('idle','idle');
+  $('outputBody').innerHTML=`<div class="placeholder-text">Generation cancelled</div>`;
+  removeHistoryItem(S.activeJobId);
+  S.running=false;
+  $('genBtn').disabled=false;
+  $('genBtn').textContent='Generate Video →';
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+function addHistoryRunning(jobId, prompt) {
+  const entry={ jobId, prompt, status:'running', startTime:Date.now() };
+  S.history.unshift(entry);
+  lss('sd_history', S.history.slice(0,30));
+  renderHistory();
+}
+
+function updateHistoryItem(jobId, videoUrl, blobUrl, cost, execTime) {
+  const entry=S.history.find(h=>h.jobId===jobId);
+  if(entry) {
+    entry.status='done';
+    entry.videoUrl=videoUrl;   // permanent URL for storage
+    entry.blobUrl=blobUrl;     // local blob for current session
+    entry.cost=cost; entry.execTime=execTime;
+    lss('sd_history', S.history.slice(0,30));
+    renderHistory();
+  }
+}
+
+function removeHistoryItem(jobId) {
+  const idx=S.history.findIndex(h=>h.jobId===jobId);
+  if(idx>-1) { S.history.splice(idx,1); lss('sd_history',S.history.slice(0,30)); renderHistory(); }
+}
+
+function renderHistory() {
+  const list=$('historyList');
+  if(!S.history.length) { list.innerHTML='<div class="history-empty">No generations yet</div>'; return; }
+  list.innerHTML=S.history.map(h=>{
+    if(h.status==='running') {
+      return `<div class="history-item">
+        <div class="history-thumb" style="display:flex;align-items:center;justify-content:center">
+          <div class="spinner" style="width:18px;height:18px;border-width:1.5px"></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="h-prompt">${h.prompt}</div>
+          <div class="h-details">Job: ${h.jobId.slice(0,20)}…</div>
+        </div>
+        <div class="h-running">● running</div>
+      </div>`;
+    }
+    const thumbSrc = h.blobUrl || h.videoUrl || '';
+    const clickUrl = h.videoUrl || '';
+    return `<div class="history-item" onclick="showFromHistory('${clickUrl}', '${thumbSrc}')">
+      <div class="history-thumb">
+        ${thumbSrc ? `<video src="${thumbSrc}" muted loop></video>` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;opacity:.3">▶</div>'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="h-prompt">${h.prompt}</div>
+        <div class="h-details">${h.execTime}s · ${new Date(h.startTime).toLocaleTimeString()}</div>
+      </div>
+      <div class="h-cost">$${parseFloat(h.cost||0).toFixed(3)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function showFromHistory(videoUrl, blobUrl) {
+  document.querySelectorAll('.tab')[0].click();
+  const slug = 'seedance_' + Date.now() + '.mp4';
+
+  // Use blobUrl if available (current session), otherwise re-fetch
+  let playUrl = blobUrl || videoUrl;
+  if (!blobUrl && videoUrl) {
+    $('outputBody').innerHTML=`
+      <div class="spinner"></div>
+      <div style="font-size:12px;color:var(--muted);font-family:var(--mono)">Loading video…</div>`;
+    try {
+      const r = await fetch(videoUrl);
+      if (r.ok) {
+        const blob = await r.blob();
+        playUrl = URL.createObjectURL(blob);
+      }
+    } catch(e) { playUrl = videoUrl; }
+  }
+
+  $('outputBody').innerHTML=`
+    <video controls autoplay loop src="${playUrl}"></video>
+    <a class="btn-download" href="${playUrl}" download="${slug}">↓ Download MP4</a>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => { 
+  loadConfig(); 
+  $('endpointUrl').value = MODEL_ENDPOINTS[S.model];
+  updateModelUI();
+  updateCost(); 
+  updatePreview(); 
+});
+$('prompt').addEventListener('input', updatePreview);
+</script>
+</body>
+</html>
