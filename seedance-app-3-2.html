@@ -199,7 +199,7 @@ video{max-width:100%;max-height:400px;border-radius:6px;background:#000}
   <div class="logo">
     <div class="logo-dot"></div>
     <span class="logo-text">VIDEO STUDIO</span>
-    <span class="logo-sub" id="headerSub">seedance 1.5 pro</span>
+    <span class="logo-sub" id="headerSub">hailuo 02 standard</span>
   </div>
   <div class="api-badge">runpod public endpoint</div>
 </header>
@@ -214,14 +214,11 @@ video{max-width:100%;max-height:400px;border-radius:6px;background:#000}
       <div class="field">
         <label>Select model <span class="tag req">required</span></label>
         <div class="radio-group" id="modelGroup" style="flex-direction:column;gap:5px">
-          <div class="radio-btn active" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('seedance-v1-5-pro-i2v','Seedance 1.5 Pro',this)">
+          <div class="radio-btn" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('seedance-v1-5-pro-i2v','Seedance 1.5 Pro',this)">
             <span>Seedance 1.5 Pro</span><span style="font-size:10px;color:var(--muted)">I2V · FLF2V · 480p/720p</span>
           </div>
-          <div class="radio-btn" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('minimax-hailuo-02-std','Hailuo 02 Standard',this)">
+          <div class="radio-btn active" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('minimax-hailuo-02-std','Hailuo 02 Standard',this)">
             <span>Hailuo 02 Standard</span><span style="font-size:10px;color:var(--muted)">T2V · I2V · FLF2V · 768p/1080p</span>
-          </div>
-          <div class="radio-btn" style="display:flex;justify-content:space-between;align-items:center" onclick="pickModel('p-video','Pruna P-Video',this)">
-            <span>Pruna P-Video</span><span style="font-size:10px;color:var(--muted)">T2V · I2V · 720p/1080p · Draft</span>
           </div>
         </div>
       </div>
@@ -315,21 +312,30 @@ video{max-width:100%;max-height:400px;border-radius:6px;background:#000}
     <div class="section">
       <div class="section-label">Video Settings</div>
 
-      <div class="field">
+      <!-- Seedance duration: continuous slider -->
+      <div class="field" id="seedanceDurationField">
         <label>input.duration <span class="tag opt">4–12s · default 5</span></label>
         <div class="slider-row">
           <input type="range" id="duration" min="4" max="12" step="1" value="5" oninput="onDur(this.value)">
           <span class="range-val" id="durVal">5s</span>
         </div>
       </div>
+      <!-- Hailuo duration: discrete 6s / 10s -->
+      <div class="field" id="hailuoDurationField" style="display:none">
+        <label>input.duration <span class="tag opt">6s or 10s</span></label>
+        <div class="radio-group" id="hDurGroup">
+          <div class="radio-btn active" onclick="pickHDur(6,this)">6s</div>
+          <div class="radio-btn" onclick="pickHDur(10,this)">10s</div>
+        </div>
+      </div>
 
       <div class="field">
-        <label>input.resolution <span class="tag opt">default 720p</span></label>
+        <label>input.resolution <span class="tag opt" id="resLabel">default 768p</span></label>
         <div class="radio-group" id="resGroup">
-          <div class="radio-btn" id="res480btn" onclick="pick('res','480p',this,'resGroup')">480p</div>
-          <div class="radio-btn" id="res768btn" style="display:none" onclick="pick('res','768p',this,'resGroup')">768p</div>
-          <div class="radio-btn active" onclick="pick('res','720p',this,'resGroup')">720p</div>
-          <div class="radio-btn" id="res1080btn" style="display:none" onclick="pick('res','1080p',this,'resGroup')">1080p</div>
+          <div class="radio-btn" id="res480btn" style="display:none" onclick="pick('res','480p',this,'resGroup')">480p</div>
+          <div class="radio-btn active" id="res768btn" onclick="pick('res','768p',this,'resGroup')">768p</div>
+          <div class="radio-btn" id="res720btn" style="display:none" onclick="pick('res','720p',this,'resGroup')">720p</div>
+          <div class="radio-btn" id="res1080btn" onclick="pick('res','1080p',this,'resGroup')">1080p</div>
         </div>
         <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:4px" id="resCostHint"></div>
       </div>
@@ -347,13 +353,32 @@ video{max-width:100%;max-height:400px;border-radius:6px;background:#000}
       </div>
 
       <div style="margin-bottom:6px">
-        <div class="toggle-row" id="cameraFixedRow">
+        <!-- Seedance-only toggles -->
+        <div class="toggle-row" id="cameraFixedRow" style="display:none">
           <div class="toggle-info"><div class="tt">input.camera_fixed</div><div class="td">Keep camera static · default false</div></div>
           <label class="toggle"><input type="checkbox" id="cameraFixed" onchange="updatePreview()"><span class="toggle-slider"></span></label>
         </div>
-        <div class="toggle-row">
+        <div class="toggle-row" id="generateAudioRow" style="display:none">
           <div class="toggle-info"><div class="tt">input.generate_audio</div><div class="td">Generate ambient audio · default false</div></div>
           <label class="toggle"><input type="checkbox" id="generateAudio" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row" id="watermarkRow" style="display:none">
+          <div class="toggle-info"><div class="tt">input.watermark</div><div class="td">Embed watermark in output · default false</div></div>
+          <label class="toggle"><input type="checkbox" id="watermark" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+        <!-- Hailuo-only toggle -->
+        <div class="toggle-row" id="promptOptimizerRow">
+          <div class="toggle-info"><div class="tt">input.prompt_optimizer</div><div class="td">Auto-enhance prompt · default true</div></div>
+          <label class="toggle"><input type="checkbox" id="promptOptimizer" checked onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <!-- Seedance-only: fps -->
+      <div class="field" id="fpsField" style="display:none">
+        <label>input.fps <span class="tag opt">8–30 · default 24</span></label>
+        <div class="slider-row">
+          <input type="range" id="fps" min="8" max="30" step="1" value="24" oninput="$('fpsVal').textContent=this.value;updatePreview()">
+          <span class="range-val" id="fpsVal">24</span>
         </div>
       </div>
 
@@ -369,7 +394,7 @@ video{max-width:100%;max-height:400px;border-radius:6px;background:#000}
     </div>
     <div class="generate-section">
       <div id="t2vNote" style="display:none;font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;padding:6px 10px;background:rgba(124,106,255,.06);border:1px solid rgba(124,106,255,.15);border-radius:5px">
-        ✦ Hailuo 2: no image required for T2V mode — image optional for I2V, set both for FLF2V
+        ✦ Hailuo 02: no image required for T2V mode — image optional for I2V, set both for FLF2V
       </div>
       <button class="btn-generate" id="genBtn" onclick="generate()">Generate Video →</button>
     </div>
@@ -415,8 +440,9 @@ video{max-width:100%;max-height:400px;border-radius:6px;background:#000}
 <script>
 // ── State ───────────────────────────────────────────────────────────────────
 const S = {
-  res: '720p', aspect: '16:9',
-  model: 'seedance-v1-5-pro-i2v',
+  res: '768p', aspect: '16:9',
+  model: 'minimax-hailuo-02-std',
+  hailuoDur: 6,
   images: [], startUrl: null, endUrl: null,
   history: [], running: false,
   // polling
@@ -428,26 +454,22 @@ const S = {
 
 // Per-model endpoint IDs (RunPod) — verified slugs
 const MODEL_ENDPOINTS = {
-  'seedance-v1-5-pro-i2v':  'https://api.runpod.ai/v2/seedance-v1-5-pro-i2v',
-  'minimax-hailuo-02-std':  'https://api.runpod.ai/v2/minimax-hailuo-02-std',
-  'p-video':                'https://api.runpod.ai/v2/p-video'
+  'seedance-v1-5-pro-i2v': 'https://api.runpod.ai/v2/seedance-v1-5-pro-i2v',
+  'minimax-hailuo-02-std':  'https://api.runpod.ai/v2/minimax-hailuo-02-std'
 };
 
-// Per-model cost tables ($/s or $/video) per resolution — from RunPod docs
+// Per-model cost tables ($/s) per resolution — from RunPod docs
 const MODEL_COSTS = {
   'seedance-v1-5-pro-i2v': { '480p': 0.024, '720p': 0.052 },
-  'minimax-hailuo-02-std':  { '768p': 0.028, '1080p': 0.048 },  // approx — check RunPod playground
-  'p-video':                { '720p': 0.020, '1080p': 0.040 }
+  'minimax-hailuo-02-std':  { '768p': 0.028, '1080p': 0.048 }
 };
 
-// Models that support 1080p (or equivalent high-res)
-const SUPPORTS_1080P = new Set(['minimax-hailuo-02-std', 'p-video']);
+// Models that support 1080p
+const SUPPORTS_1080P = new Set(['minimax-hailuo-02-std']);
 // Models that support T2V (no image required)
-const SUPPORTS_T2V = new Set(['minimax-hailuo-02-std', 'p-video']);
-// Models that support FLF2V (last_image / end frame)
+const SUPPORTS_T2V = new Set(['minimax-hailuo-02-std']);
+// Models that support FLF2V (end frame)
 const SUPPORTS_FLF2V = new Set(['seedance-v1-5-pro-i2v', 'minimax-hailuo-02-std']);
-// Models that support draft mode
-const SUPPORTS_DRAFT = new Set(['p-video']);
 
 const POLL_INTERVAL = 3000; // 3 seconds
 
@@ -473,47 +495,77 @@ function updateModelUI() {
   const isHailuo = S.model === 'minimax-hailuo-02-std';
   const costs = MODEL_COSTS[S.model];
 
-  // Show/hide 1080p button; for Hailuo swap 480p→768p
-  const btn480 = $('res480btn');
-  const btn768 = $('res768btn');
+  // Resolution buttons: Hailuo uses 768p/1080p; Seedance uses 480p/720p
+  const btn480  = $('res480btn');
+  const btn768  = $('res768btn');
+  const btn720  = $('res720btn');
   const btn1080 = $('res1080btn');
 
   if(isHailuo) {
-    if(btn480) btn480.style.display = 'none';
-    if(btn768) btn768.style.display = '';
-    // if currently on 480p, switch to 768p
-    if(S.res === '480p') { S.res = '768p'; activateRes('768p'); }
-  } else {
-    if(btn480) btn480.style.display = '';
-    if(btn768) btn768.style.display = 'none';
-    if(S.res === '768p') { S.res = '720p'; activateRes('720p'); }
-  }
-
-  if(SUPPORTS_1080P.has(S.model)) {
+    if(btn480)  btn480.style.display  = 'none';
+    if(btn720)  btn720.style.display  = 'none';
+    if(btn768)  btn768.style.display  = '';
     if(btn1080) btn1080.style.display = '';
+    if(S.res === '480p' || S.res === '720p') { S.res = '768p'; activateRes('768p'); }
   } else {
+    if(btn480)  btn480.style.display  = '';
+    if(btn720)  btn720.style.display  = '';
+    if(btn768)  btn768.style.display  = 'none';
     if(btn1080) btn1080.style.display = 'none';
-    if(S.res === '1080p') { S.res = isHailuo ? '768p' : '720p'; activateRes(S.res); }
+    if(S.res === '768p' || S.res === '1080p') { S.res = '720p'; activateRes('720p'); }
   }
 
   // Update cost hint
   const hint = $('resCostHint');
   if(hint) hint.textContent = Object.entries(costs).map(([r,c])=>`${r}: $${c}/s`).join('  ·  ');
 
-  // Hide camera_fixed for Hailuo (not supported)
-  const cfRow = $('cameraFixedRow');
-  if(cfRow) cfRow.style.display = isHailuo ? 'none' : '';
+  // Duration: Seedance = slider, Hailuo = discrete 6s/10s
+  const seedanceDur = $('seedanceDurationField');
+  const hailuoDur   = $('hailuoDurationField');
+  if(seedanceDur) seedanceDur.style.display = isHailuo ? 'none' : '';
+  if(hailuoDur)   hailuoDur.style.display   = isHailuo ? '' : 'none';
 
-  // Show T2V note for models that don't require an image
+  // Seedance-only controls
+  const show = v => v ? v.style.display = '' : null;
+  const hide = v => v ? v.style.display = 'none' : null;
+  if(isHailuo) {
+    hide($('cameraFixedRow'));
+    hide($('generateAudioRow'));
+    hide($('watermarkRow'));
+    hide($('fpsField'));
+    show($('promptOptimizerRow'));
+    hide($('arGroup') ? $('arGroup').closest('.field') : null);
+  } else {
+    show($('cameraFixedRow'));
+    show($('generateAudioRow'));
+    show($('watermarkRow'));
+    show($('fpsField'));
+    hide($('promptOptimizerRow'));
+    show($('arGroup') ? $('arGroup').closest('.field') : null);
+  }
+
+  // Resolution default label
+  const resLabel = $('resLabel');
+  if(resLabel) resLabel.textContent = isHailuo ? 'default 768p' : 'default 720p';
+
+  // T2V note
   const t2vNote = $('t2vNote');
   if(t2vNote) t2vNote.style.display = SUPPORTS_T2V.has(S.model) ? '' : 'none';
 }
 
 function activateRes(res) {
   document.querySelectorAll('#resGroup .radio-btn').forEach(b=>{
-    b.classList.toggle('active', b.textContent.startsWith(res));
+    b.classList.toggle('active', b.textContent.trim() === res);
   });
   S.res = res;
+}
+
+function pickHDur(val, el) {
+  document.querySelectorAll('#hDurGroup .radio-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  S.hailuoDur = val;
+  updateCost();
+  updatePreview();
 }
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -655,41 +707,37 @@ function pick(key,val,el,groupId) {
   el.classList.add('active'); S[key]=val; updateCost(); updatePreview();
 }
 function onDur(v) { $('durVal').textContent=v+'s'; updateCost(); updatePreview(); }
-function updateCost() { const d=parseInt($('duration').value); const costs=MODEL_COSTS[S.model]||MODEL_COSTS['seedance-v1-5-pro-i2v']; $('costVal').textContent='$'+((costs[S.res]||0.052)*d).toFixed(3); }
+function updateCost() {
+  const isHailuo = S.model === 'minimax-hailuo-02-std';
+  const d = isHailuo ? S.hailuoDur : parseInt($('duration').value);
+  const costs = MODEL_COSTS[S.model] || MODEL_COSTS['seedance-v1-5-pro-i2v'];
+  $('costVal').textContent = '$' + ((costs[S.res] || 0.052) * d).toFixed(3);
+}
 
 // ── Request preview ──────────────────────────────────────────────────────────
 function buildPayload() {
   const isHailuo = S.model === 'minimax-hailuo-02-std';
-  const isPVideo  = S.model === 'p-video';
-  const isFLF2V   = !!(S.startUrl && S.endUrl) && SUPPORTS_FLF2V.has(S.model);
+  const isFLF2V  = !!(S.startUrl && S.endUrl) && SUPPORTS_FLF2V.has(S.model);
 
   const input = {
     prompt: $('prompt').value || 'cinematic video',
-    duration: parseInt($('duration').value),
+    duration: isHailuo ? S.hailuoDur : parseInt($('duration').value),
     resolution: S.res,
     seed: parseInt($('seed').value)
   };
 
   if(isHailuo) {
-    // Hailuo 02 uses image / end_image
-    if(S.startUrl) input.image = S.startUrl;
+    if(S.startUrl) input.image     = S.startUrl;
     if(isFLF2V)    input.end_image = S.endUrl;
-    input.prompt_optimizer = true;
+    input.prompt_optimizer = $('promptOptimizer').checked;
   } else {
-    // Seedance + P-Video use image / last_image
-    if(S.startUrl) input.image = S.startUrl;
+    if(S.startUrl) input.image      = S.startUrl;
     if(isFLF2V)    input.last_image = S.endUrl;
-    input.aspect_ratio = S.aspect;
-  }
-
-  if(!isHailuo && !isPVideo) {
-    // Seedance-specific
+    input.aspect_ratio   = S.aspect;
     input.camera_fixed   = $('cameraFixed').checked;
     input.generate_audio = $('generateAudio').checked;
-  }
-  if(isPVideo) {
-    input.fps = 24;
-    input.prompt_upsampling = true;
+    input.watermark      = $('watermark').checked;
+    input.fps            = parseInt($('fps').value);
   }
 
   return { input };
@@ -1027,12 +1075,12 @@ async function showFromHistory(videoUrl, blobUrl) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-window.addEventListener('load', () => { 
-  loadConfig(); 
+window.addEventListener('load', () => {
+  loadConfig();
   $('endpointUrl').value = MODEL_ENDPOINTS[S.model];
   updateModelUI();
-  updateCost(); 
-  updatePreview(); 
+  updateCost();
+  updatePreview();
 });
 $('prompt').addEventListener('input', updatePreview);
 </script>
