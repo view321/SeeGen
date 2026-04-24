@@ -444,12 +444,8 @@ const S = {
   model: 'minimax-hailuo-02-std',
   hailuoDur: 6,
   images: [], startUrl: null, endUrl: null,
-  history: [], running: false,
-  // polling
-  activeJobId: null,
-  activeJobStartTime: null,
-  pollTimer: null,
-  elapsedTimer: null
+  history: [],
+  jobs: new Map() // jobId → { pollTimer, prompt, startTime, endpoint }
 };
 
 // Per-model endpoint IDs (RunPod) — verified slugs
@@ -582,20 +578,20 @@ function loadConfig() {
   updateCfgStatus();
   const imgs = lsj('sd_imgs');
   if(imgs) { S.images = imgs; renderGrid(); }
-  // Restore history
   const hist = lsj('sd_history');
   if(hist) { S.history = hist; renderHistory(); }
-  // Restore any in-progress job
-  const job = lsj('sd_active_job');
-  if(job && job.id) {
-    S.activeJobId = job.id;
-    S.activeJobStartTime = job.startTime;
-    S.running = true;
-    $('genBtn').disabled = true;
-    $('genBtn').textContent = 'Generating…';
-    showPollingUI(job.id, job.prompt);
-    startPolling(job.id, job.prompt);
-  }
+  // Resume any in-progress jobs (supports both old single and new multi format)
+  const savedJobs = lsj('sd_active_jobs') || [];
+  const oldJob = lsj('sd_active_job');
+  if(oldJob && oldJob.id) savedJobs.push({ id: oldJob.id, prompt: oldJob.prompt, startTime: oldJob.startTime, endpoint: MODEL_ENDPOINTS[S.model] });
+  localStorage.removeItem('sd_active_job');
+  savedJobs.forEach(j => {
+    if(!j.id) return;
+    const pollTimer = setInterval(() => pollJob(j.id, j.endpoint), POLL_INTERVAL);
+    S.jobs.set(j.id, { pollTimer, prompt: j.prompt, startTime: j.startTime, endpoint: j.endpoint });
+    pollJob(j.id, j.endpoint);
+  });
+  updateRunningBadge();
 }
 function updateCfgStatus() {
   const ok = $('ghRepo').value.trim() && $('ghToken').value.trim();
@@ -775,174 +771,135 @@ function setStatus(type,text) {
   $('statusText').textContent=text;
 }
 
-// ── Elapsed timer ─────────────────────────────────────────────────────────────
-function startElapsedTimer() {
-  if(S.elapsedTimer) clearInterval(S.elapsedTimer);
-  S.elapsedTimer = setInterval(() => {
-    const el=$('elapsedTime');
-    if(!el) return;
-    const secs=Math.floor((Date.now()-S.activeJobStartTime)/1000);
-    const m=Math.floor(secs/60), s=secs%60;
-    el.textContent=m>0?`${m}m ${s}s`:`${s}s`;
-  }, 1000);
-}
-function stopElapsedTimer() {
-  if(S.elapsedTimer) { clearInterval(S.elapsedTimer); S.elapsedTimer=null; }
+// ── Elapsed helper ────────────────────────────────────────────────────────────
+function fmtElapsed(startTime) {
+  const secs = Math.floor((Date.now() - startTime) / 1000);
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-// ── Polling UI ────────────────────────────────────────────────────────────────
-function showPollingUI(jobId, prompt) {
-  setStatus('running','generating');
-  // Switch to output tab
-  document.querySelectorAll('.tab')[0].click();
-  $('outputBody').innerHTML=`
-    <div class="polling-wrap">
-      <div class="spinner"></div>
-      <div class="polling-info">
-        Generating video…<br>
-        <span class="elapsed">Elapsed: <span id="elapsedTime">0s</span></span>
-      </div>
-      <div class="polling-id">Job ID: ${jobId}</div>
-      <div class="job-persist-bar">
-        <div class="jp-text">Job saved — <span>safe to close this tab</span> and reopen to resume</div>
-        <button class="btn-cancel" onclick="cancelJob()">Cancel</button>
-      </div>
-    </div>`;
-  startElapsedTimer();
+// ── Running badge ─────────────────────────────────────────────────────────────
+function updateRunningBadge() {
+  const n = S.jobs.size;
+  if(n > 0) {
+    setStatus('running', n === 1 ? '1 generating' : `${n} generating`);
+  } else {
+    setStatus('idle', 'idle');
+  }
+}
+
+// ── Persist active jobs ───────────────────────────────────────────────────────
+function saveActiveJobs() {
+  const arr = [];
+  S.jobs.forEach((job, id) => arr.push({ id, prompt: job.prompt, startTime: job.startTime, endpoint: job.endpoint }));
+  lss('sd_active_jobs', arr);
 }
 
 // ── Generate ──────────────────────────────────────────────────────────────────
 async function generate() {
-  const apiKey=$('apiKey').value.trim();
+  const apiKey = $('apiKey').value.trim();
   if(!apiKey) { alert('Enter your RunPod API key'); return; }
-  // T2V models don't require an image; others do
   if(!S.startUrl && !SUPPORTS_T2V.has(S.model)) { alert('Select a start frame from the image library'); return; }
-  if(S.running) return;
 
-  S.running=true;
-  $('genBtn').disabled=true;
-  $('genBtn').textContent='Starting…';
+  const btn = $('genBtn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
 
-  const payload=buildPayload();
-  const prompt=payload.input.prompt;
-  const endpoint=getEndpoint();
+  const payload  = buildPayload();
+  const prompt   = payload.input.prompt;
+  const endpoint = getEndpoint();
 
   try {
-    const res=await fetch(`${endpoint}/run`,{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
+    const res  = await fetch(`${endpoint}/run`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-    const data=await res.json();
-    if(!res.ok||data.error) throw new Error(data.error||JSON.stringify(data));
+    const data = await res.json();
+    if(!res.ok || data.error) throw new Error(data.error || JSON.stringify(data));
 
-    const jobId=data.id;
-    S.activeJobId=jobId;
-    S.activeJobStartTime=Date.now();
-
-    // Persist job to localStorage immediately
-    lss('sd_active_job',{ id:jobId, startTime:S.activeJobStartTime, prompt });
-
-    // Add to history as "running"
-    addHistoryRunning(jobId, prompt);
-
-    showPollingUI(jobId, prompt);
-    startPolling(jobId, prompt);
+    const jobId     = data.id;
+    const startTime = Date.now();
+    const pollTimer = setInterval(() => pollJob(jobId, endpoint), POLL_INTERVAL);
+    S.jobs.set(jobId, { pollTimer, prompt, startTime, endpoint });
+    saveActiveJobs();
+    addHistoryRunning(jobId, prompt, startTime);
+    updateRunningBadge();
+    // Switch to History tab so user can see the running job
+    document.querySelectorAll('.tab')[2].click();
+    pollJob(jobId, endpoint);
 
   } catch(e) {
-    S.running=false;
-    $('genBtn').disabled=false;
-    $('genBtn').textContent='Generate Video →';
-    setStatus('error','failed');
-    $('outputBody').innerHTML=`<div class="error-box">${e.message}</div>`;
+    setStatus('error', 'failed');
+    $('outputBody').innerHTML = `<div class="error-box">${e.message}</div>`;
+    document.querySelectorAll('.tab')[0].click();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Video →';
   }
 }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
-function startPolling(jobId, prompt) {
-  if(S.pollTimer) clearInterval(S.pollTimer);
-  S.pollTimer=setInterval(()=>pollStatus(jobId, prompt), POLL_INTERVAL);
-  // Poll immediately once
-  pollStatus(jobId, prompt);
-}
-
-async function pollStatus(jobId, prompt) {
-  const apiKey=$('apiKey').value.trim();
-  if(!apiKey) return; // Can't poll without key
+async function pollJob(jobId, endpoint) {
+  const apiKey = $('apiKey').value.trim();
+  if(!apiKey) return;
+  const job = S.jobs.get(jobId);
+  if(!job) return;
 
   try {
-    const res=await fetch(`${getEndpoint()}/status/${jobId}`,{
-      headers:{'Authorization':'Bearer '+apiKey}
+    const res  = await fetch(`${endpoint}/status/${jobId}`, {
+      headers: { 'Authorization': 'Bearer ' + apiKey }
     });
-    const data=await res.json();
+    const data = await res.json();
 
-    if(data.status==='COMPLETED') {
-      finishJob(jobId, prompt, data);
-    } else if(data.status==='FAILED' || data.status==='CANCELLED') {
-      failJob(jobId, prompt, data);
+    if(data.status === 'COMPLETED') {
+      clearInterval(job.pollTimer);
+      S.jobs.delete(jobId);
+      saveActiveJobs();
+      updateRunningBadge();
+      finishJob(jobId, job.prompt, data);
+    } else if(data.status === 'FAILED' || data.status === 'CANCELLED') {
+      clearInterval(job.pollTimer);
+      S.jobs.delete(jobId);
+      saveActiveJobs();
+      updateRunningBadge();
+      failJob(jobId, job.prompt, data);
     }
-    // IN_QUEUE or IN_PROGRESS → keep polling
-    updatePollingStatus(data.status);
-
   } catch(e) {
-    // Network error — keep polling, don't fail
     console.warn('Poll error:', e.message);
   }
 }
 
-function updatePollingStatus(status) {
-  const info=document.querySelector('.polling-info');
-  if(!info) return;
-  const msgs={ IN_QUEUE:'In queue…', IN_PROGRESS:'Generating video…', COMPLETED:'Done!', FAILED:'Failed' };
-  const first=info.firstChild;
-  if(first && first.nodeType===3) first.textContent=(msgs[status]||status)+'\n';
-}
-
 async function finishJob(jobId, prompt, data) {
-  stopPolling();
-  stopElapsedTimer();
-  clearActiveJob();
-
-  const output = data.output || {};
+  const output   = data.output || {};
   const videoUrl = output.video_url || output.result || output.url || output.video || output.output
-    || (Array.isArray(output) ? output[0] : null)
-    || null;
-  const cost = output.cost;
-  const execTime = data.executionTime ? (data.executionTime/1000).toFixed(1) : '—';
+    || (Array.isArray(output) ? output[0] : null) || null;
+  const cost     = output.cost;
+  const execTime = data.executionTime ? (data.executionTime / 1000).toFixed(1) : '—';
 
-  setStatus('done','completed');
-
-  if (!videoUrl) {
-    $('outputBody').innerHTML=`
-      <div class="error-box">Completed but no video URL found.\n\nRaw output:\n${JSON.stringify(data, null, 2)}</div>`;
+  if(!videoUrl) {
     updateHistoryItem(jobId, null, null, cost, execTime);
-    S.running=false;
-    $('genBtn').disabled=false;
-    $('genBtn').textContent='Generate Video →';
+    if(S.jobs.size === 0) setStatus('done', 'completed');
     return;
   }
 
-  const slug = prompt.slice(0,30).replace(/[^a-z0-9]/gi,'_').toLowerCase();
-  const filename = `seedance_${Date.now()}_${slug}.mp4`;
-
-  // Show brief loading state while fetching blob
-  $('outputBody').innerHTML=`
-    <div class="spinner"></div>
-    <div style="font-size:12px;color:var(--muted);font-family:var(--mono)">Fetching video…</div>`;
+  const slug     = prompt.slice(0, 30).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const filename = `video_${Date.now()}_${slug}.mp4`;
 
   // Fetch as blob to bypass CDN CORS restrictions
   let blobUrl = videoUrl;
   try {
     const r = await fetch(videoUrl);
-    if (r.ok) {
-      const blob = await r.blob();
-      blobUrl = URL.createObjectURL(blob);
-    }
+    if(r.ok) { const blob = await r.blob(); blobUrl = URL.createObjectURL(blob); }
   } catch(e) {
     console.warn('Blob fetch failed, using direct URL:', e.message);
   }
 
-  $('outputBody').innerHTML=`
+  // Show result in Output tab
+  if(S.jobs.size === 0) setStatus('done', 'completed');
+  else updateRunningBadge();
+  document.querySelectorAll('.tab')[0].click();
+  $('outputBody').innerHTML = `
     <video controls autoplay loop src="${blobUrl}"></video>
     <div class="result-meta">
       <div class="meta-card"><div class="meta-key">cost</div><div class="meta-val green">$${parseFloat(cost||0).toFixed(3)}</div></div>
@@ -951,54 +908,35 @@ async function finishJob(jobId, prompt, data) {
     </div>
     <a class="btn-download" href="${blobUrl}" download="${filename}">↓ Download MP4</a>`;
 
-  // Store original URL in history (blob URLs die on reload)
   updateHistoryItem(jobId, videoUrl, blobUrl, cost, execTime);
-
-  S.running=false;
-  $('genBtn').disabled=false;
-  $('genBtn').textContent='Generate Video →';
 }
 
 function failJob(jobId, prompt, data) {
-  stopPolling();
-  stopElapsedTimer();
-  clearActiveJob();
-  setStatus('error','failed');
-  $('outputBody').innerHTML=`<div class="error-box">${JSON.stringify(data,null,2)}</div>`;
   removeHistoryItem(jobId);
-  S.running=false;
-  $('genBtn').disabled=false;
-  $('genBtn').textContent='Generate Video →';
+  if(S.jobs.size === 0) setStatus('idle', 'idle');
+  // Show error in output tab only if nothing else is running
+  if(S.jobs.size === 0) {
+    document.querySelectorAll('.tab')[0].click();
+    $('outputBody').innerHTML = `<div class="error-box">${JSON.stringify(data, null, 2)}</div>`;
+  }
 }
 
-function stopPolling() {
-  if(S.pollTimer) { clearInterval(S.pollTimer); S.pollTimer=null; }
-}
-
-function clearActiveJob() {
-  S.activeJobId=null;
-  S.activeJobStartTime=null;
-  localStorage.removeItem('sd_active_job');
-}
-
-function cancelJob() {
-  if(!confirm('Cancel the current generation? The job may still run on RunPod.')) return;
-  stopPolling();
-  stopElapsedTimer();
-  clearActiveJob();
-  setStatus('idle','idle');
-  $('outputBody').innerHTML=`<div class="placeholder-text">Generation cancelled</div>`;
-  removeHistoryItem(S.activeJobId);
-  S.running=false;
-  $('genBtn').disabled=false;
-  $('genBtn').textContent='Generate Video →';
+function cancelJob(jobId) {
+  if(!confirm('Cancel this generation? The job may still run on RunPod.')) return;
+  const job = S.jobs.get(jobId);
+  if(!job) return;
+  clearInterval(job.pollTimer);
+  S.jobs.delete(jobId);
+  saveActiveJobs();
+  removeHistoryItem(jobId);
+  updateRunningBadge();
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
-function addHistoryRunning(jobId, prompt) {
-  const entry={ jobId, prompt, status:'running', startTime:Date.now() };
+function addHistoryRunning(jobId, prompt, startTime) {
+  const entry = { jobId, prompt, status: 'running', startTime: startTime || Date.now() };
   S.history.unshift(entry);
-  lss('sd_history', S.history.slice(0,30));
+  lss('sd_history', S.history.slice(0, 30));
   renderHistory();
 }
 
@@ -1024,15 +962,16 @@ function renderHistory() {
   if(!S.history.length) { list.innerHTML='<div class="history-empty">No generations yet</div>'; return; }
   list.innerHTML=S.history.map(h=>{
     if(h.status==='running') {
-      return `<div class="history-item">
+      const elapsed = fmtElapsed(h.startTime);
+      return `<div class="history-item" data-jobid="${h.jobId}">
         <div class="history-thumb" style="display:flex;align-items:center;justify-content:center">
           <div class="spinner" style="width:18px;height:18px;border-width:1.5px"></div>
         </div>
         <div style="flex:1;min-width:0">
           <div class="h-prompt">${h.prompt}</div>
-          <div class="h-details">Job: ${h.jobId.slice(0,20)}…</div>
+          <div class="h-details h-elapsed" data-start="${h.startTime}">${elapsed} · ${h.jobId.slice(0,16)}…</div>
         </div>
-        <div class="h-running">● running</div>
+        <button class="btn-cancel" style="margin-left:8px;flex-shrink:0" onclick="cancelJob('${h.jobId}')">✕</button>
       </div>`;
     }
     const thumbSrc = h.blobUrl || h.videoUrl || '';
@@ -1052,7 +991,7 @@ function renderHistory() {
 
 async function showFromHistory(videoUrl, blobUrl) {
   document.querySelectorAll('.tab')[0].click();
-  const slug = 'seedance_' + Date.now() + '.mp4';
+  const slug = 'video_' + Date.now() + '.mp4';
 
   // Use blobUrl if available (current session), otherwise re-fetch
   let playUrl = blobUrl || videoUrl;
@@ -1073,6 +1012,17 @@ async function showFromHistory(videoUrl, blobUrl) {
     <video controls autoplay loop src="${playUrl}"></video>
     <a class="btn-download" href="${playUrl}" download="${slug}">↓ Download MP4</a>`;
 }
+
+// ── Elapsed ticker (updates running job times in-place every second) ──────────
+setInterval(() => {
+  document.querySelectorAll('.h-elapsed').forEach(el => {
+    const start = parseInt(el.dataset.start, 10);
+    if(!start) return;
+    const jobId = el.closest('[data-jobid]')?.dataset.jobid;
+    const shortId = jobId ? jobId.slice(0, 16) + '…' : '';
+    el.textContent = fmtElapsed(start) + (shortId ? ' · ' + shortId : '');
+  });
+}, 1000);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
